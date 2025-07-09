@@ -166,6 +166,9 @@ export default function RoastPage() {
   const [error, setError] = useState<string | null>(null);
   const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9));
 
+  // Debug logging
+  console.log('RoastPage rendering, currentStep:', currentStep);
+
   const handleRoastSubmit = async (formData: RoastFormData) => {
     setCurrentStep("loading");
     setError(null);
@@ -253,6 +256,12 @@ export default function RoastPage() {
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-8">
+        {/* Debug fallback */}
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold text-white">LinkedIn Roast AI</h1>
+          <p className="text-gray-400">Debug: Component is rendering</p>
+        </div>
+        
         <AnimatePresence mode="wait">
           {currentStep === "input" && (
             <motion.div
