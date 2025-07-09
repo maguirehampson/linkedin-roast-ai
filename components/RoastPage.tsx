@@ -7,8 +7,8 @@ import { Flame, Zap, Target, Share2, Mail, RefreshCw } from "lucide-react";
 import RoastForm from "./roast/RoastForm";
 import LoadingState from "./roast/LoadingState";
 import RoastResults from "./roast/RoastResults";
-import EmailCapture from "./roast/EmailCapture";
-import ShareModal from "./roast/ShareModal";
+// import EmailCapture from "./roast/EmailCapture";
+// import ShareModal from "./roast/ShareModal";
 
 // Proper TypeScript interfaces
 interface RoastResult {
@@ -305,6 +305,7 @@ export default function RoastPage() {
           )}
         </AnimatePresence>
 
+        {/* Temporarily commented out to debug
         {showEmailCapture && (
           <EmailCapture
             isOpen={showEmailCapture}
@@ -320,6 +321,7 @@ export default function RoastPage() {
             roastData={roastData}
           />
         )}
+        */}
       </div>
     </div>
   );

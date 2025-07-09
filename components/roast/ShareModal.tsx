@@ -18,6 +18,10 @@ interface RoastResult {
   hashtags_to_avoid: string[];
   top_skills_to_highlight: string[];
   session_id: string;
+  vibe_tags: string[];
+  share_quote: string;
+  meme_caption: string;
+  diagnostics: { type: string; text: string; comment: string }[];
 }
 
 interface ShareModalProps {
