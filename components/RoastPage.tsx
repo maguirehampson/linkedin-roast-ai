@@ -23,6 +23,10 @@ interface RoastResult {
   hashtags_to_avoid: string[];
   top_skills_to_highlight: string[];
   session_id: string;
+  vibe_tags: string[];
+  share_quote: string;
+  meme_caption: string;
+  diagnostics: { type: string; text: string; comment: string }[];
 }
 
 interface EmailLead {
@@ -205,6 +209,10 @@ export default function RoastPage() {
         constructive_path_forward: response.constructive_path_forward,
         hashtags_to_avoid: response.hashtags_to_avoid,
         top_skills_to_highlight: response.top_skills_to_highlight,
+        vibe_tags: response.vibe_tags,
+        share_quote: response.share_quote,
+        meme_caption: response.meme_caption,
+        diagnostics: response.diagnostics,
         session_id: sessionId
       });
 
