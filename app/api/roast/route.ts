@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { ROASTBOT_SYSTEM_PROMPT } from '@/ai/systemPrompt';
-import { RoastDB } from '@/lib/supabase-server';
 
 // Initialize OpenAI client at runtime
 const getOpenAIClient = () => {
@@ -14,7 +13,7 @@ const getOpenAIClient = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { goals, profileText, contextText, profilePdfUrl, contextFileUrl } = await request.json();
+    const { goals, profileText, contextText } = await request.json();
 
     // Validate input
     if (!goals || !profileText) {
@@ -93,29 +92,11 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
     if (!Array.isArray(roastData.vibe_tags)) throw new Error('vibe_tags must be an array');
     if (!Array.isArray(roastData.diagnostics)) throw new Error('diagnostics must be an array');
 
-    // Store the roast result in Supabase using service role key
-    const storedRoast = await RoastDB.create({
-      goals_text: goals,
-      profile_text: profileText,
-      context_text: contextText,
-      roast_text: roastData.roast,
-      savage_score: roastData.savage_score,
-      brutal_feedback: roastData.brutal_feedback,
-      constructive_path_forward: roastData.constructive_path_forward,
-      hashtags_to_avoid: roastData.hashtags_to_avoid,
-      top_skills_to_highlight: roastData.top_skills_to_highlight,
-      vibe_tags: roastData.vibe_tags,
-      share_quote: roastData.share_quote,
-      meme_caption: roastData.meme_caption,
-      diagnostics: roastData.diagnostics,
-      session_id: Math.random().toString(36).substr(2, 9),
-      profile_pdf_url: profilePdfUrl,
-      context_file_url: contextFileUrl
-    });
-
+    // Return the roast data without storing in database
     return NextResponse.json({
       ...roastData,
-      id: storedRoast.id
+      id: Math.random().toString(36).substr(2, 9), // Generate a simple ID for testing
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
