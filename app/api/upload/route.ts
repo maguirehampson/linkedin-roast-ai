@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SupabaseStorage } from '@/lib/supabase-server';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,10 +43,22 @@ export async function POST(request: NextRequest) {
 
     console.log('Attempting to upload file:', fileName, 'Size:', buffer.length, 'Type:', file.type);
 
-    // Upload to Supabase Storage
-    const fileUrl = await SupabaseStorage.uploadFile(buffer, fileName, file.type);
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = join(process.cwd(), 'uploads');
+    try {
+      await mkdir(uploadsDir, { recursive: true });
+    } catch (error) {
+      console.log('Uploads directory already exists or could not be created');
+    }
+
+    // Save file locally
+    const filePath = join(uploadsDir, fileName);
+    await writeFile(filePath, buffer);
     
-    console.log('File uploaded successfully:', fileUrl);
+    console.log('File uploaded successfully to:', filePath);
+
+    // Return local file URL for testing
+    const fileUrl = `/api/uploads/${fileName}`;
 
     return NextResponse.json({
       success: true,
@@ -55,22 +68,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error uploading file:', error);
-    
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (error.message.includes('Supabase client not initialized')) {
-        return NextResponse.json(
-          { error: 'Storage service not configured. Please check environment variables.' },
-          { status: 500 }
-        );
-      }
-      if (error.message.includes('Failed to upload file to Supabase Storage')) {
-        return NextResponse.json(
-          { error: 'Failed to upload file to storage. Please try again.' },
-          { status: 500 }
-        );
-      }
-    }
     
     return NextResponse.json(
       { error: 'Failed to upload file' },

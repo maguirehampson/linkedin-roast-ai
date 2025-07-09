@@ -5,8 +5,51 @@ import React, { useState } from "react";
 export default function RoastPage() {
   const [goals, setGoals] = useState("");
   const [profileText, setProfileText] = useState("");
+  const [profileFile, setProfileFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  const handleFileUpload = async (file: File) => {
+    setIsExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const uploadResult = await response.json();
+      
+      // Extract text from the uploaded file
+      const extractResponse = await fetch('/api/extract-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileUrl: uploadResult.file_url }),
+      });
+
+      if (!extractResponse.ok) {
+        throw new Error('Failed to extract text from PDF');
+      }
+
+      const extractResult = await extractResponse.json();
+      setProfileText(extractResult.text);
+      setProfileFile(file);
+    } catch (error) {
+      console.error('Error processing file:', error);
+      alert('Error processing PDF. Please try again or paste text manually.');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +87,7 @@ export default function RoastPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-4">LinkedIn Roast AI</h1>
-          <p className="text-gray-400">🔥 Test Mode - No Database Storage</p>
+          <p className="text-gray-400">🔥 Test Mode - PDF Upload + Text Input Available</p>
         </div>
 
         {!result ? (
@@ -66,21 +109,55 @@ export default function RoastPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Paste your LinkedIn profile text here * 
+                  Upload LinkedIn Profile PDF (Optional)
+                </label>
+                <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleFileUpload(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <div className="space-y-2">
+                      <div className="text-2xl">📄</div>
+                      <div className="text-gray-300">
+                        {isExtracting ? 'Extracting text from PDF...' : 'Click to upload PDF or drag and drop'}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {profileFile ? `Uploaded: ${profileFile.name}` : 'PDF files only'}
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  LinkedIn Profile Text *
                 </label>
                 <textarea
                   value={profileText}
                   onChange={(e) => setProfileText(e.target.value)}
-                  placeholder="Paste your LinkedIn 'About' section, professional summary, or bio here..."
+                  placeholder="Paste your LinkedIn 'About' section, professional summary, or bio here... (or upload a PDF above)"
                   className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400"
                   rows={8}
                   required
                 />
+                <p className="text-sm text-gray-500 mt-1">
+                  {profileFile ? '✅ Text extracted from PDF above' : '📝 Paste manually or upload PDF'}
+                </p>
               </div>
               
               <button
                 type="submit"
-                disabled={!goals.trim() || !profileText.trim() || isSubmitting}
+                disabled={!goals.trim() || !profileText.trim() || isSubmitting || isExtracting}
                 className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg"
               >
                 {isSubmitting ? '🔥 Generating Roast...' : '🔥 Roast Me!'}
@@ -162,6 +239,7 @@ export default function RoastPage() {
                   setResult(null);
                   setGoals("");
                   setProfileText("");
+                  setProfileFile(null);
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
               >

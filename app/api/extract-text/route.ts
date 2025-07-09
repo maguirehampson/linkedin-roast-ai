@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pdf from 'pdf-parse';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,20 +17,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Download the file from Supabase Storage URL
-    console.log('Attempting to download file from:', fileUrl);
-    const response = await fetch(fileUrl);
-    
-    if (!response.ok) {
-      console.error('Failed to download file. Status:', response.status, 'StatusText:', response.statusText);
-      throw new Error(`Failed to download file from Supabase Storage. Status: ${response.status}`);
+    // Extract filename from the URL
+    const fileName = fileUrl.split('/').pop();
+    if (!fileName) {
+      return NextResponse.json(
+        { error: 'Invalid file URL' },
+        { status: 400 }
+      );
     }
 
-    const dataBuffer = await response.arrayBuffer();
-    console.log('File downloaded successfully. Size:', dataBuffer.byteLength);
+    // Read file from local uploads directory
+    const uploadsDir = join(process.cwd(), 'uploads');
+    const filePath = join(uploadsDir, fileName);
+    
+    console.log('Attempting to read file from:', filePath);
+    
+    let dataBuffer: Buffer;
+    try {
+      dataBuffer = await readFile(filePath);
+    } catch (error) {
+      console.error('Failed to read file:', error);
+      return NextResponse.json(
+        { error: 'File not found. Please upload again.' },
+        { status: 404 }
+      );
+    }
+
+    console.log('File read successfully. Size:', dataBuffer.length);
 
     // Extract text from PDF
-    const data = await pdf(Buffer.from(dataBuffer));
+    const data = await pdf(dataBuffer);
     
     // Clean up the extracted text
     const text = data.text
@@ -54,15 +72,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
-    
-    if (error instanceof Error) {
-      if (error.message.includes('Failed to download file')) {
-        return NextResponse.json(
-          { error: 'Failed to download file from storage. Please try uploading again.' },
-          { status: 500 }
-        );
-      }
-    }
     
     return NextResponse.json(
       { error: 'Failed to extract text from PDF' },
