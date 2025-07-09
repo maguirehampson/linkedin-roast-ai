@@ -1,0 +1,1001 @@
+import React, { useState } from "react";
+import { RoastResult, EmailLead } from "@/entities/all";
+import { InvokeLLM, UploadFile } from "@/integrations/Core";
+import { motion, AnimatePresence } from "framer-motion";
+import { Flame, Zap, Target, Share2, Mail, RefreshCw } from "lucide-react";
+
+import RoastForm from "../components/roast/RoastForm";
+import LoadingState from "../components/roast/LoadingState";
+import RoastResults from "../components/roast/RoastResults";
+import EmailCapture from "../components/roast/EmailCapture";
+import ShareModal from "../components/roast/ShareModal";
+
+export default function RoastPage() {
+  const [currentStep, setCurrentStep] = useState("input"); // input, loading, results
+  const [roastData, setRoastData] = useState(null);
+  const [showEmailCapture, setShowEmailCapture] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [sessionId] = useState(() => Math.random().toString(36).substr(2, 9));
+
+  const handleRoastSubmit = async ({ profilePdf, goals, contextFile }) => {
+    setCurrentStep("loading");
+    
+    try {
+      const fileUrls = [];
+      let profilePdfUrl = '';
+      let contextFileUrl = null;
+
+      // Upload profile PDF
+      const { file_url: pdfUrl } = await UploadFile({ file: profilePdf });
+      profilePdfUrl = pdfUrl;
+      fileUrls.push(profilePdfUrl);
+
+      // Upload context file if it exists
+      if (contextFile) {
+        const { file_url: contextUrl } = await UploadFile({ file: contextFile });
+        contextFileUrl = contextUrl;
+        fileUrls.push(contextUrl); // Use contextUrl here, not contextFileUrl again. Corrected.
+      }
+
+      const prompt = `You are a brutally honest AI career coach. A user has uploaded their LinkedIn profile as a PDF and potentially another context file (like a resume). They have also described their goals.
+
+User's Goals: "${goals}"
+
+Your task is to analyze the attached documents (especially the LinkedIn profile) in the context of their goals. Then, roast their profile with savage humor but also provide constructive feedback.
+
+Provide your response in the following JSON format:
+1. A witty, sarcastic roast (2-3 sentences) based on the profile PDF.
+2. A score from 0-100 for profile quality.
+3. 3-5 specific improvement suggestions tailored to their goals.
+4. 3-5 vibe tags that describe this profile.
+
+Be funny, be honest, but ultimately be helpful. The goal is to make them laugh while giving them real value. Refer to the content within the uploaded files.`;
+
+      const response = await InvokeLLM({
+        prompt,
+        file_urls: fileUrls,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            roast: { type: "string" },
+            score: { type: "number", minimum: 0, maximum: 100 },
+            suggestions: {
+              type: "array",
+              items: { type: "string" }
+            },
+            vibe_tags: {
+              type: "array",
+              items: { type: "string" }
+            }
+          },
+          required: ["roast", "score", "suggestions", "vibe_tags"]
+        }
+      });
+
+      const result = await RoastResult.create({
+        goals_text: goals,
+        profile_pdf_url: profilePdfUrl,
+        context_file_url: contextFileUrl,
+        roast_text: response.roast,
+        score: response.score,
+        suggestions: response.suggestions,
+        vibe_tags: response.vibe_tags,
+        session_id: sessionId
+      });
+
+      setRoastData(result);
+      setCurrentStep("results");
+    } catch (error) {
+      console.error("Error generating roast:", error);
+      alert("Sorry, our AI roaster is taking a coffee break. Please try again!");
+      setCurrentStep("input");
+    }
+  };
+
+  const handleTryAgain = () => {
+    setCurrentStep("input");
+    setRoastData(null);
+  };
+
+  const handleEmailSubmit = async (email) => {
+    try {
+      await EmailLead.create({
+        email,
+        roast_result_id: roastData?.id,
+        wants_upgrade: true
+      });
+      setShowEmailCapture(false);
+      alert("Thanks! We'll send you the full makeover guide soon 🔥");
+    } catch (error) {
+      console.error("Error saving email:", error);
+      alert("Something went wrong. Please try again.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen gradient-bg">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-12"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Flame className="w-12 h-12 text-red-500" />
+            <h1 className="text-4xl md:text-6xl font-bold text-shadow">
+              LinkedIn <span className="text-red-500">Roast</span> AI
+            </h1>
+          </div>
+          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            Get brutally honest feedback from our AI career coach. 
+            Upload your LinkedIn profile and prepare to get <span className="text-yellow-400">flamed</span>.
+          </p>
+        </motion.div>
+
+        {/* Main Content */}
+        <div className="relative">
+          <AnimatePresence mode="wait">
+            {currentStep === "input" && (
+              <motion.div
+                key="input"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3 }}
+              >
+                <RoastForm onSubmit={handleRoastSubmit} />
+              </motion.div>
+            )}
+
+            {currentStep === "loading" && (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3 }}
+              >
+                <LoadingState />
+              </motion.div>
+            )}
+
+            {currentStep === "results" && roastData && (
+              <motion.div
+                key="results"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3 }}
+              >
+                <RoastResults
+                  roastData={roastData}
+                  onTryAgain={handleTryAgain}
+                  onShare={() => setShowShareModal(true)}
+                  onEmailCapture={() => setShowEmailCapture(true)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Footer */}
+        <motion.footer
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-16 text-center text-gray-500"
+        >
+          <p>© 2025 Roast Labs. Built by savage AI and human sarcasm.</p>
+          <div className="flex justify-center gap-6 mt-4">
+            <a href="#" className="hover:text-red-500 transition-colors">Terms</a>
+            <a href="#" className="hover:text-red-500 transition-colors">Privacy</a>
+            <a href="mailto:hello@linkedinroast.ai" className="hover:text-red-500 transition-colors">Contact</a>
+          </div>
+        </motion.footer>
+      </div>
+
+      {/* Modals */}
+      <EmailCapture
+        isOpen={showEmailCapture}
+        onClose={() => setShowEmailCapture(false)}
+        onSubmit={handleEmailSubmit}
+      />
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        roastData={roastData}
+      />
+    </div>
+  );
+}
+
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { motion } from "framer-motion";
+import { Flame, Zap, Target, FileText, Goal } from "lucide-react";
+import FileUploadZone from "./FileUploadZone";
+
+export default function RoastForm({ onSubmit }) {
+  const [profilePdf, setProfilePdf] = useState(null);
+  const [goals, setGoals] = useState("");
+  const [contextFile, setContextFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!profilePdf || !goals.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      await onSubmit({ profilePdf, goals, contextFile });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-700"
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <Target className="w-6 h-6 text-red-500" />
+        <h2 className="text-2xl font-bold">Ready to get roasted?</h2>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* Step 1: Profile PDF Upload */}
+        <div className="space-y-2">
+          <label className="font-semibold flex items-center gap-2">
+            <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">1</span>
+            Upload LinkedIn Profile (PDF)
+            <span className="text-red-500">*</span>
+          </label>
+          <FileUploadZone
+            onFileSelect={setProfilePdf}
+            acceptedTypes=".pdf"
+            label="Upload PDF Profile"
+            file={profilePdf}
+          />
+        </div>
+        
+        {/* Step 2: Goals Textbox */}
+        <div className="space-y-2">
+          <label htmlFor="goals" className="font-semibold flex items-center gap-2">
+            <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">2</span>
+            Describe Your Goals
+            <span className="text-red-500">*</span>
+          </label>
+          <Textarea
+            id="goals"
+            value={goals}
+            onChange={(e) => setGoals(e.target.value)}
+            placeholder="e.g., 'I'm trying to switch from marketing to data science,' or 'I want to attract more freelance clients for web design.'"
+            className="min-h-24 bg-gray-900 border-gray-600 text-white placeholder-gray-400 rounded-xl resize-none custom-scrollbar"
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {/* Step 3: Optional Context Upload */}
+        <div className="space-y-2">
+          <label className="font-semibold flex items-center gap-2">
+            <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center">3</span>
+            Upload Resume/CV (Optional)
+          </label>
+          <FileUploadZone
+            onFileSelect={setContextFile}
+            acceptedTypes=".pdf,.doc,.docx"
+            label="Upload Resume/Portfolio"
+            file={contextFile}
+          />
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <Button
+            type="submit"
+            disabled={!profilePdf || !goals.trim() || isSubmitting}
+            className="flex-1 fire-gradient hover:opacity-90 text-white font-bold py-4 px-8 rounded-xl transition-all duration-200 glow-effect"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+                Roasting...
+              </>
+            ) : (
+              <>
+                <Flame className="w-5 h-5 mr-2" />
+                Roast Me 🔥
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </motion.div>
+  );
+}
+
+import React from "react";
+import { motion } from "framer-motion";
+import { Flame, Zap, Target, Brain } from "lucide-react";
+
+export default function LoadingState() {
+  const loadingMessages = [
+    "Analyzing your professional cringe...",
+    "Summoning brutal honesty...",
+    "Decoding corporate buzzwords...",
+    "Preparing savage feedback...",
+    "Consulting the roast gods...",
+    "Loading sarcasm algorithms...",
+    "Measuring your LinkedIn energy...",
+    "Calculating cringe levels..."
+  ];
+
+  const [currentMessage, setCurrentMessage] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentMessage(prev => (prev + 1) % loadingMessages.length);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="bg-gray-800 rounded-2xl p-12 shadow-2xl border border-gray-700 text-center"
+    >
+      <div className="relative mb-8">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          className="w-24 h-24 mx-auto mb-6"
+        >
+          <div className="w-full h-full rounded-full border-4 border-gray-600 border-t-red-500 border-r-yellow-400"></div>
+        </motion.div>
+
+        <motion.div
+          animate={{ scale: [1, 1.1, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <Brain className="w-12 h-12 text-red-500" />
+        </motion.div>
+      </div>
+
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-3xl font-bold mb-4 text-red-500"
+      >
+        Roasting in Progress...
+      </motion.h2>
+
+      <motion.p
+        key={currentMessage}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className="text-xl text-gray-300 mb-8"
+      >
+        {loadingMessages[currentMessage]}
+      </motion.p>
+
+      <div className="flex justify-center gap-8">
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+          className="flex flex-col items-center gap-2"
+        >
+          <Flame className="w-8 h-8 text-orange-500" />
+          <span className="text-sm text-gray-400">Analyzing</span>
+        </motion.div>
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, delay: 0.3 }}
+          className="flex flex-col items-center gap-2"
+        >
+          <Zap className="w-8 h-8 text-yellow-500" />
+          <span className="text-sm text-gray-400">Processing</span>
+        </motion.div>
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, delay: 0.6 }}
+          className="flex flex-col items-center gap-2"
+        >
+          <Target className="w-8 h-8 text-red-500" />
+          <span className="text-sm text-gray-400">Roasting</span>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+import { Flame, TrendingUp, Lightbulb, Tag, Share2, Mail, RefreshCw } from "lucide-react";
+
+export default function RoastResults({ roastData, onTryAgain, onShare, onEmailCapture }) {
+  const getScoreColor = (score) => {
+    if (score >= 80) return "text-green-400";
+    if (score >= 60) return "text-yellow-400";
+    if (score >= 40) return "text-orange-400";
+    return "text-red-400";
+  };
+
+  const getScoreEmoji = (score) => {
+    if (score >= 80) return "🔥";
+    if (score >= 60) return "👍";
+    if (score >= 40) return "😬";
+    return "💩";
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      {/* The Roast */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+        className="bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-700"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <Flame className="w-6 h-6 text-red-500" />
+          <h2 className="text-2xl font-bold text-red-500">The Roast 🔥</h2>
+        </div>
+        <div className="bg-gray-900 rounded-xl p-6 border-l-4 border-red-500">
+          <p className="text-lg leading-relaxed text-gray-100">
+            {roastData.roast_text}
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Score */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2 }}
+        className="bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-700"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <TrendingUp className="w-6 h-6 text-yellow-500" />
+          <h2 className="text-2xl font-bold">Profile Score</h2>
+        </div>
+        <div className="text-center">
+          <div className={`text-6xl font-bold ${getScoreColor(roastData.score)} mb-2`}>
+            {roastData.score}/100
+          </div>
+          <div className="text-4xl mb-4">{getScoreEmoji(roastData.score)}</div>
+          <div className="w-full bg-gray-700 rounded-full h-4 mb-4">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${roastData.score}%` }}
+              transition={{ duration: 1, delay: 0.5 }}
+              className="score-gradient h-4 rounded-full"
+            />
+          </div>
+          <p className="text-gray-400">
+            {roastData.score >= 80 ? "LinkedIn Legend!" : 
+             roastData.score >= 60 ? "Not bad, but could be better" :
+             roastData.score >= 40 ? "Room for improvement" : 
+             "Needs serious work"}
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Suggestions */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.3 }}
+        className="bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-700"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <Lightbulb className="w-6 h-6 text-yellow-500" />
+          <h2 className="text-2xl font-bold">Suggestions 💡</h2>
+        </div>
+        <div className="space-y-4">
+          {roastData.suggestions.map((suggestion, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + index * 0.1 }}
+              className="flex items-start gap-3 p-4 bg-gray-900 rounded-lg"
+            >
+              <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-sm flex-shrink-0">
+                {index + 1}
+              </div>
+              <p className="text-gray-100">{suggestion}</p>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Vibe Tags */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.4 }}
+        className="bg-gray-800 rounded-2xl p-8 shadow-2xl border border-gray-700"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <Tag className="w-6 h-6 text-purple-500" />
+          <h2 className="text-2xl font-bold">Vibe Tags 🎭</h2>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {roastData.vibe_tags.map((tag, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5 + index * 0.1 }}
+            >
+              <Badge className="bg-purple-600 text-white px-4 py-2 text-sm">
+                {tag}
+              </Badge>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="flex flex-col sm:flex-row gap-4"
+      >
+        <Button
+          onClick={onShare}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200"
+        >
+          <Share2 className="w-5 h-5 mr-2" />
+          Share My Roast
+        </Button>
+        <Button
+          onClick={onEmailCapture}
+          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200"
+        >
+          <Mail className="w-5 h-5 mr-2" />
+          Get Full Makeover
+        </Button>
+        <Button
+          onClick={onTryAgain}
+          variant="outline"
+          className="border-gray-600 text-gray-300 hover:bg-gray-700 font-bold py-4 px-6 rounded-xl transition-all duration-200"
+        >
+          <RefreshCw className="w-5 h-5 mr-2" />
+          Try Again
+        </Button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
+import { Mail, Sparkles, X } from "lucide-react";
+
+export default function EmailCapture({ isOpen, onClose, onSubmit }) {
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      await onSubmit(email);
+      setEmail("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-2xl">
+            <Sparkles className="w-6 h-6 text-yellow-500" />
+            Want a Full Makeover?
+          </DialogTitle>
+        </DialogHeader>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="text-center">
+            <p className="text-gray-300 mb-4">
+              Get a complete LinkedIn profile rewrite + personal branding teardown sent to your inbox.
+            </p>
+            <div className="flex items-center justify-center gap-4 text-sm text-gray-400">
+              <div className="flex items-center gap-1">
+                <Mail className="w-4 h-4" />
+                <span>No spam</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Sparkles className="w-4 h-4" />
+                <span>Free upgrade</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="bg-gray-900 border-gray-600 text-white placeholder-gray-400 h-12 rounded-xl"
+              required
+            />
+            
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700"
+              >
+                Maybe Later
+              </Button>
+              <Button
+                type="submit"
+                disabled={!email.trim() || isSubmitting}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Upgrade
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </motion.div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { motion } from "framer-motion";
+import { Share2, Copy, Twitter, Linkedin } from "lucide-react";
+
+export default function ShareModal({ isOpen, onClose, roastData }) {
+  const shareText = `I just got roasted by LinkedIn AI! 🔥 
+
+My profile scored ${roastData?.score}/100 and got called out for being: ${roastData?.vibe_tags?.join(", ")}
+
+Get your own brutal LinkedIn roast at LinkedInRoast.ai`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(shareText);
+    alert("Copied to clipboard!");
+  };
+
+  const shareOnTwitter = () => {
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(tweetUrl, '_blank');
+  };
+
+  const shareOnLinkedIn = () => {
+    const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`;
+    window.open(linkedInUrl, '_blank');
+  };
+
+  if (!roastData) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-2xl">
+            <Share2 className="w-6 h-6 text-blue-500" />
+            Share Your Roast
+          </DialogTitle>
+        </DialogHeader>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-6"
+        >
+          <div className="bg-gray-900 rounded-xl p-4 border border-gray-700">
+            <p className="text-sm text-gray-300 whitespace-pre-line">
+              {shareText}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <Button
+              onClick={copyToClipboard}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copy to Clipboard
+            </Button>
+            
+            <Button
+              onClick={shareOnTwitter}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              <Twitter className="w-4 h-4 mr-2" />
+              Share on Twitter
+            </Button>
+            
+            <Button
+              onClick={shareOnLinkedIn}
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white"
+            >
+              <Linkedin className="w-4 h-4 mr-2" />
+              Share on LinkedIn
+            </Button>
+          </div>
+        </motion.div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useCallback, useState } from "react";
+import { motion } from "framer-motion";
+import { UploadCloud, File, X } from "lucide-react";
+
+export default function FileUploadZone({ onFileSelect, acceptedTypes, label, file }) {
+  const [dragActive, setDragActive] = useState(false);
+
+  const handleDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      onFileSelect(e.dataTransfer.files[0]);
+    }
+  }, [onFileSelect]);
+
+  const handleChange = (e) => {
+    e.preventDefault();
+    if (e.target.files && e.target.files[0]) {
+      onFileSelect(e.target.files[0]);
+    }
+  };
+  
+  const inputId = `file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`;
+
+  if (file) {
+    return (
+      <div className="bg-gray-700 rounded-xl p-4 flex items-center justify-between border border-green-500">
+        <div className="flex items-center gap-3">
+          <File className="w-5 h-5 text-green-400" />
+          <span className="text-sm text-white">{file.name}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => onFileSelect(null)}
+          className="text-gray-400 hover:text-white"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <label
+      htmlFor={inputId}
+      className={`relative border-2 border-dashed rounded-xl p-6 flex flex-col justify-center items-center cursor-pointer transition-colors duration-200
+      ${dragActive ? "border-red-500 bg-gray-800" : "border-gray-600 hover:border-red-500"}`}
+      onDragEnter={handleDrag}
+      onDragOver={handleDrag}
+      onDragLeave={handleDrag}
+      onDrop={handleDrop}
+    >
+      <input
+        id={inputId}
+        type="file"
+        accept={acceptedTypes}
+        onChange={handleChange}
+        className="hidden"
+      />
+      <motion.div
+        whileHover={{ scale: 1.05 }}
+        className="flex flex-col items-center"
+      >
+        <UploadCloud className="w-8 h-8 mb-2 text-gray-400" />
+        <span className="font-semibold text-white">{label}</span>
+        <span className="text-xs text-gray-400">Drag & drop or click to upload</span>
+      </motion.div>
+    </label>
+  );
+}
+
+{
+  "name": "RoastResult",
+  "type": "object",
+  "properties": {
+    "goals_text": {
+      "type": "string",
+      "description": "User's stated goals and context"
+    },
+    "profile_pdf_url": {
+      "type": "string",
+      "description": "URL to the uploaded LinkedIn profile PDF"
+    },
+    "context_file_url": {
+      "type": "string",
+      "description": "URL to the optional additional context file (e.g., resume)"
+    },
+    "roast_text": {
+      "type": "string",
+      "description": "The AI-generated roast"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Profile quality score"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Improvement suggestions"
+    },
+    "vibe_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Profile vibe tags"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Unique session identifier"
+    }
+  },
+  "required": [
+    "goals_text",
+    "profile_pdf_url",
+    "roast_text",
+    "score"
+  ]
+}
+
+{
+  "name": "EmailLead",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User's email address"
+    },
+    "roast_result_id": {
+      "type": "string",
+      "description": "Reference to the roast result"
+    },
+    "wants_upgrade": {
+      "type": "boolean",
+      "default": true,
+      "description": "User wants full profile makeover"
+    }
+  },
+  "required": [
+    "email"
+  ]
+}
+
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+
+export default function Layout({ children, currentPageName }) {
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      <style>{`
+        :root {
+          --primary: #FF4747;
+          --background: #1A1A1A;
+          --text: #FFFFFF;
+          --accent: #FFE066;
+          --dark-bg: #0F0F0F;
+          --card-bg: #2A2A2A;
+        }
+        
+        body {
+          background: var(--background);
+          color: var(--text);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .gradient-bg {
+          background: radial-gradient(circle at 50% 50%, #2C2C2C 0%, #000000 100%);
+        }
+        
+        .fire-gradient {
+          background: linear-gradient(135deg, #FF4747 0%, #FF6B6B 100%);
+        }
+        
+        .score-gradient {
+          background: linear-gradient(90deg, #FF0000 0%, #FFFF00 50%, #00FF00 100%);
+        }
+        
+        .glow-effect {
+          box-shadow: 0 0 20px rgba(255, 71, 71, 0.3);
+        }
+        
+        .text-shadow {
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(255, 71, 71, 0.3); }
+          50% { box-shadow: 0 0 30px rgba(255, 71, 71, 0.6); }
+        }
+        
+        .pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: var(--card-bg);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: var(--primary);
+          border-radius: 4px;
+        }
+      `}</style>
+      
+      <div className="relative">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
