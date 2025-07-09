@@ -305,17 +305,21 @@ export default function RoastPage() {
           )}
         </AnimatePresence>
 
-        <EmailCapture
-          isOpen={showEmailCapture}
-          onClose={() => setShowEmailCapture(false)}
-          onSubmit={handleEmailCapture}
-        />
+        {showEmailCapture && (
+          <EmailCapture
+            isOpen={showEmailCapture}
+            onClose={() => setShowEmailCapture(false)}
+            onSubmit={handleEmailCapture}
+          />
+        )}
 
-        <ShareModal
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
-          roastData={roastData}
-        />
+        {showShareModal && roastData && (
+          <ShareModal
+            isOpen={showShareModal}
+            onClose={() => setShowShareModal(false)}
+            roastData={roastData}
+          />
+        )}
       </div>
     </div>
   );

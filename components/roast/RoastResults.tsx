@@ -90,7 +90,7 @@ export default function RoastResults({ roastData, onTryAgain, onEmailCapture, on
       >
         {/* Vibe Tags */}
         <div className="mb-2 flex flex-wrap gap-2 justify-center">
-          {roastData.vibe_tags && roastData.vibe_tags.map((tag, idx) => (
+          {roastData.vibe_tags && roastData.vibe_tags.length > 0 && roastData.vibe_tags.map((tag, idx) => (
             <Badge key={idx} variant="outline" className="text-xs px-2 py-1 border-blue-400 text-blue-300">
               {tag}
             </Badge>
@@ -98,18 +98,22 @@ export default function RoastResults({ roastData, onTryAgain, onEmailCapture, on
         </div>
         {/* Share Quote & Meme Caption */}
         <div className="flex flex-col md:flex-row gap-4 justify-center items-center mb-2">
-          <div className="flex items-center gap-2">
-            <span className="italic text-gray-200">“{roastData.share_quote}”</span>
-            <Button size="icon" variant="ghost" onClick={() => copyToClipboard(roastData.share_quote)} title="Copy share quote">
-              <Share2 className="w-4 h-4 text-blue-400" />
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="italic text-gray-400">{roastData.meme_caption}</span>
-            <Button size="icon" variant="ghost" onClick={() => copyToClipboard(roastData.meme_caption)} title="Copy meme caption">
-              <Share2 className="w-4 h-4 text-yellow-400" />
-            </Button>
-          </div>
+          {roastData.share_quote && (
+            <div className="flex items-center gap-2">
+              <span className="italic text-gray-200">"{roastData.share_quote}"</span>
+              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(roastData.share_quote)} title="Copy share quote">
+                <Share2 className="w-4 h-4 text-blue-400" />
+              </Button>
+            </div>
+          )}
+          {roastData.meme_caption && (
+            <div className="flex items-center gap-2">
+              <span className="italic text-gray-400">{roastData.meme_caption}</span>
+              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(roastData.meme_caption)} title="Copy meme caption">
+                <Share2 className="w-4 h-4 text-yellow-400" />
+              </Button>
+            </div>
+          )}
         </div>
         {/* Diagnostics */}
         {roastData.diagnostics && roastData.diagnostics.length > 0 && (
@@ -118,7 +122,7 @@ export default function RoastResults({ roastData, onTryAgain, onEmailCapture, on
             <ul className="space-y-1">
               {roastData.diagnostics.map((diag, idx) => (
                 <li key={idx} className="text-xs text-gray-300 bg-gray-800 rounded px-2 py-1">
-                  <span className="font-semibold text-red-400">[{diag.type}]</span> <span className="text-blue-200">“{diag.text}”</span> <span className="text-gray-400">— {diag.comment}</span>
+                  <span className="font-semibold text-red-400">[{diag.type}]</span> <span className="text-blue-200">"{diag.text}"</span> <span className="text-gray-400">— {diag.comment}</span>
                 </li>
               ))}
             </ul>
