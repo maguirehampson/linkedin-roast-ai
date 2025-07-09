@@ -82,7 +82,7 @@ const extractTextFromPDF = async (file: File): Promise<string> => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ filePath: file_url }),
+      body: JSON.stringify({ fileUrl: file_url }),
     });
 
     if (!response.ok) {
