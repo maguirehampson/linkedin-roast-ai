@@ -57,6 +57,7 @@ export default function RoastPage() {
     
     setIsSubmitting(true);
     try {
+      console.log('Submitting roast request...');
       const response = await fetch('/api/roast', {
         method: 'POST',
         headers: {
@@ -68,15 +69,21 @@ export default function RoastPage() {
         }),
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to generate roast');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to generate roast');
       }
 
       const data = await response.json();
+      console.log('Roast data received:', data);
       setResult(data);
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error generating roast. Please try again.');
+      console.error('Error generating roast:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error generating roast: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
