@@ -40,8 +40,12 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    console.log('Attempting to upload file:', fileName, 'Size:', buffer.length, 'Type:', file.type);
+
     // Upload to Supabase Storage
     const fileUrl = await SupabaseStorage.uploadFile(buffer, fileName, file.type);
+    
+    console.log('File uploaded successfully:', fileUrl);
 
     return NextResponse.json({
       success: true,
@@ -51,6 +55,23 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error uploading file:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('Supabase client not initialized')) {
+        return NextResponse.json(
+          { error: 'Storage service not configured. Please check environment variables.' },
+          { status: 500 }
+        );
+      }
+      if (error.message.includes('Failed to upload file to Supabase Storage')) {
+        return NextResponse.json(
+          { error: 'Failed to upload file to storage. Please try again.' },
+          { status: 500 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Failed to upload file' },
       { status: 500 }
