@@ -30,6 +30,10 @@ export interface RoastResult {
   session_id: string;
   profile_pdf_url?: string;
   context_file_url?: string;
+  vibe_tags: string[];
+  share_quote: string;
+  meme_caption: string;
+  diagnostics: any[];
 }
 
 export interface EmailLead {

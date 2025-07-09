@@ -70,12 +70,28 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
     }
 
     // Validate the response structure
-    const requiredFields = ['roast', 'savage_score', 'brutal_feedback', 'constructive_path_forward', 'hashtags_to_avoid', 'top_skills_to_highlight'];
+    const requiredFields = [
+      'roast',
+      'savage_score',
+      'brutal_feedback',
+      'constructive_path_forward',
+      'hashtags_to_avoid',
+      'top_skills_to_highlight',
+      'vibe_tags',
+      'share_quote',
+      'meme_caption',
+      'diagnostics'
+    ];
     for (const field of requiredFields) {
       if (!(field in roastData)) {
         throw new Error(`Missing required field: ${field}`);
       }
     }
+    // Type checks for arrays and diagnostics
+    if (!Array.isArray(roastData.hashtags_to_avoid)) throw new Error('hashtags_to_avoid must be an array');
+    if (!Array.isArray(roastData.top_skills_to_highlight)) throw new Error('top_skills_to_highlight must be an array');
+    if (!Array.isArray(roastData.vibe_tags)) throw new Error('vibe_tags must be an array');
+    if (!Array.isArray(roastData.diagnostics)) throw new Error('diagnostics must be an array');
 
     // Store the roast result in Supabase using service role key
     const storedRoast = await RoastDB.create({
@@ -88,6 +104,10 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
       constructive_path_forward: roastData.constructive_path_forward,
       hashtags_to_avoid: roastData.hashtags_to_avoid,
       top_skills_to_highlight: roastData.top_skills_to_highlight,
+      vibe_tags: roastData.vibe_tags,
+      share_quote: roastData.share_quote,
+      meme_caption: roastData.meme_caption,
+      diagnostics: roastData.diagnostics,
       session_id: Math.random().toString(36).substr(2, 9),
       profile_pdf_url: profilePdfUrl,
       context_file_url: contextFileUrl
