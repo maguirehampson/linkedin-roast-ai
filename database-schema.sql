@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS roasts (
     session_id TEXT NOT NULL,
     profile_pdf_url TEXT,
     context_file_url TEXT,
+    vibe_tags TEXT[] NOT NULL, -- AI-generated vibe tags
+    share_quote TEXT NOT NULL, -- Shareable quote for social media
+    meme_caption TEXT NOT NULL, -- Caption for memes/images
+    diagnostics JSONB NOT NULL, -- Detailed diagnostic breakdown
     roast_output JSONB NOT NULL -- Full AI response JSON for production data analysis
 );
 
