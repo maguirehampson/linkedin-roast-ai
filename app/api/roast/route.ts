@@ -165,7 +165,7 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
         storedRoast = await RoastDB.create({
           goals_text: goals,
           profile_text: profileText,
-          context_text: contextText || null,
+          context_text: contextText || undefined,
           roast_text: roastData.roast,
           savage_score: `${roastData.savage_score}/100`,
           brutal_feedback: roastData.brutal_feedback,
@@ -173,8 +173,8 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
           hashtags_to_avoid: roastData.hashtags_to_avoid,
           top_skills_to_highlight: roastData.top_skills_to_highlight,
           session_id: sessionId,
-          profile_pdf_url: null, // Will be set by frontend if needed
-          context_file_url: null, // Will be set by frontend if needed
+          profile_pdf_url: undefined, // Will be set by frontend if needed
+          context_file_url: undefined, // Will be set by frontend if needed
           vibe_tags: roastData.vibe_tags,
           share_quote: roastData.share_quote,
           meme_caption: roastData.meme_caption,
