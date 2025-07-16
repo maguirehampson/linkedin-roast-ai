@@ -90,7 +90,6 @@ export const SupabaseStorage = {
       console.error('Detailed Supabase Storage error:', {
         error,
         message: error.message,
-        statusCode: error.statusCode,
         fileName,
         contentType
       });
