@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pdf from 'pdf-parse';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-// Removed: import getConfig from 'next/config';
 
 export async function POST(request: NextRequest) {
   // Removed: const { publicRuntimeConfig } = getConfig();
@@ -20,33 +17,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract filename from the URL
-    const fileName = fileUrl.split('/').pop();
-    if (!fileName) {
-      return NextResponse.json(
-        { error: 'Invalid file URL' },
-        { status: 400 }
-      );
+    // Handle test mode vs production
+    let dataBuffer: Buffer;
+    
+    if (process.env.TEST_MODE === 'true') {
+      // Test mode: Return mock extracted text
+      console.log('Test mode: Returning mock PDF text extraction');
+      
+      const mockText = `John Doe
+Senior Software Engineer at TechCorp
+San Francisco, CA | john.doe@email.com | LinkedIn: linkedin.com/in/johndoe
+
+PROFESSIONAL SUMMARY
+Experienced software engineer with 5+ years developing scalable web applications. 
+Passionate about clean code, team collaboration, and delivering high-quality solutions.
+
+EXPERIENCE
+Senior Software Engineer | TechCorp | 2021 - Present
+• Led development of microservices architecture serving 1M+ users
+• Improved application performance by 40% through optimization
+• Mentored 3 junior developers and established code review processes
+
+Software Engineer | StartupXYZ | 2019 - 2021  
+• Built full-stack applications using React, Node.js, and PostgreSQL
+• Collaborated with product team to deliver features on tight deadlines
+• Implemented automated testing reducing bugs by 60%
+
+SKILLS
+JavaScript, TypeScript, React, Node.js, Python, PostgreSQL, AWS, Docker
+
+EDUCATION
+Bachelor of Science in Computer Science | University of California | 2019`;
+
+      return NextResponse.json({
+        success: true,
+        text: mockText,
+        pages: 1,
+        info: { Title: 'Mock LinkedIn Profile' }
+      });
     }
 
-    // Read file from local uploads directory
-    const uploadsDir = join(process.cwd(), 'uploads');
-    const filePath = join(uploadsDir, fileName);
-    
-    console.log('Attempting to read file from:', filePath);
-    
-    let dataBuffer: Buffer;
+    // Production mode: Fetch file from Supabase Storage and extract text
     try {
-      dataBuffer = await readFile(filePath);
+      console.log('Production mode: Fetching file from URL:', fileUrl);
+      
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      dataBuffer = Buffer.from(arrayBuffer);
+      
+      console.log('File fetched successfully. Size:', dataBuffer.length);
     } catch (error) {
-      console.error('Failed to read file:', error);
+      console.error('Failed to fetch file from URL:', error);
       return NextResponse.json(
-        { error: 'File not found. Please upload again.' },
+        { error: 'Could not access uploaded file. Please try uploading again.' },
         { status: 404 }
       );
     }
-
-    console.log('File read successfully. Size:', dataBuffer.length);
 
     // Extract text from PDF
     const data = await pdf(dataBuffer);

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-// Removed: import getConfig from 'next/config';
+import { SupabaseStorage } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   // Removed: const { publicRuntimeConfig } = getConfig();
@@ -46,28 +44,33 @@ export async function POST(request: NextRequest) {
 
     console.log('Attempting to upload file:', fileName, 'Size:', buffer.length, 'Type:', file.type);
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'uploads');
-    try {
-      await mkdir(uploadsDir, { recursive: true });
-    } catch (error) {
-      console.log('Uploads directory already exists or could not be created');
+    // Check if in test mode - use in-memory storage
+    if (process.env.TEST_MODE === 'true') {
+      // In test mode, return a mock URL
+      const fileUrl = `/api/uploads/${fileName}`;
+      console.log('Test mode: Mock file upload successful');
+      
+      return NextResponse.json({
+        success: true,
+        file_url: fileUrl,
+        file_name: fileName
+      });
     }
 
-    // Save file locally
-    const filePath = join(uploadsDir, fileName);
-    await writeFile(filePath, buffer);
-    
-    console.log('File uploaded successfully to:', filePath);
+    // Production: Upload to Supabase Storage
+    try {
+      const fileUrl = await SupabaseStorage.uploadFile(buffer, fileName, file.type);
+      console.log('File uploaded successfully to Supabase:', fileUrl);
 
-    // Return local file URL for testing
-    const fileUrl = `/api/uploads/${fileName}`;
-
-    return NextResponse.json({
-      success: true,
-      file_url: fileUrl,
-      file_name: fileName
-    });
+      return NextResponse.json({
+        success: true,
+        file_url: fileUrl,
+        file_name: fileName
+      });
+    } catch (storageError) {
+      console.error('Supabase storage error:', storageError);
+      throw new Error('Failed to upload to cloud storage');
+    }
 
   } catch (error) {
     console.error('Error uploading file:', error);
