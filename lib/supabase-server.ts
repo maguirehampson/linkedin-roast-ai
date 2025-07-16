@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import getConfig from 'next/config';
 
 // Server-side Supabase client with service role key for privileged operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,7 +56,26 @@ export const SupabaseStorage = {
   async uploadFile(file: Buffer, fileName: string, contentType: string): Promise<string> {
     ensureNotTestMode();
     if (!supabaseServer) {
+      console.error('Supabase client not initialized. Environment variables:', {
+        url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        serviceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
       throw new Error('Supabase client not initialized. Check environment variables.');
+    }
+
+    console.log('Attempting to upload to Supabase Storage:', {
+      fileName,
+      contentType,
+      fileSize: file.length,
+      bucket: 'roast-pdfs'
+    });
+
+    // First, check if bucket exists
+    const { data: buckets, error: bucketError } = await supabaseServer.storage.listBuckets();
+    if (bucketError) {
+      console.error('Error listing buckets:', bucketError);
+    } else {
+      console.log('Available buckets:', buckets?.map(b => b.name));
     }
 
     const { data, error } = await supabaseServer.storage
@@ -69,15 +87,24 @@ export const SupabaseStorage = {
       });
 
     if (error) {
-      console.error('Error uploading to Supabase Storage:', error);
-      throw new Error('Failed to upload file to Supabase Storage');
+      console.error('Detailed Supabase Storage error:', {
+        error,
+        message: error.message,
+        statusCode: error.statusCode,
+        fileName,
+        contentType
+      });
+      throw new Error(`Failed to upload file to Supabase Storage: ${error.message}`);
     }
+
+    console.log('File uploaded successfully:', data);
 
     // Get the public URL
     const { data: urlData } = supabaseServer.storage
       .from('roast-pdfs')
       .getPublicUrl(fileName);
 
+    console.log('Generated public URL:', urlData.publicUrl);
     return urlData.publicUrl;
   },
 
