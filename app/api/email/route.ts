@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { EmailDB } from '@/lib/supabase-server';
+import getConfig from 'next/config';
 
 export async function POST(request: NextRequest) {
+  // Use process.env.TEST_MODE directly
+  if (process.env.TEST_MODE === 'true') {
+    return NextResponse.json(
+      { error: 'Email capture is paused in Test Mode.' },
+      { status: 503 }
+    );
+  }
   try {
     const { email, roast_result_id, wants_upgrade } = await request.json();
 

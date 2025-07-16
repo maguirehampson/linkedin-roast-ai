@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+// Removed: import getConfig from 'next/config';
 
 export async function POST(request: NextRequest) {
+  // Removed: const { publicRuntimeConfig } = getConfig();
+  // Remove the TEST_MODE check for file upload
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;

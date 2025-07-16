@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import pdf from 'pdf-parse';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+// Removed: import getConfig from 'next/config';
 
 export async function POST(request: NextRequest) {
+  // Removed: const { publicRuntimeConfig } = getConfig();
+  // Remove the TEST_MODE check for extract-text
   try {
     const { fileUrl } = await request.json();
     

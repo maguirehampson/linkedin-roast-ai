@@ -176,6 +176,11 @@ ls -la data/
 - [ ] Implement CSRF protection
 - [ ] Add input sanitization
 
+## ⚙️ Test Mode Flag
+
+- Set `TEST_MODE=true` in your environment to disable file upload, storage, database, email capture, and sharing (for testing/demo)
+- Set `TEST_MODE=false` to enable all features for production
+
 ## 🚀 Next Steps After Deployment
 
 1. **Test the full user flow**

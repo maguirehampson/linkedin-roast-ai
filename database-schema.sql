@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS roasts (
     top_skills_to_highlight TEXT[] NOT NULL,
     session_id TEXT NOT NULL,
     profile_pdf_url TEXT,
-    context_file_url TEXT
+    context_file_url TEXT,
+    roast_output JSONB NOT NULL -- Full AI response JSON for production data analysis
 );
 
 -- Emails table

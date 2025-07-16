@@ -67,6 +67,21 @@ Please test and provide feedback on:
 - **OpenAI API only** - no other external services
 - **Simple deployment** - just needs OpenAI key
 
+## ⚙️ Test Mode Flag
+
+This project uses a `TEST_MODE` environment variable to control which features are enabled:
+
+- When `TEST_MODE=true` (default for local testing):
+  - File upload, PDF extraction, and AI roast generation are **enabled** for local iteration and prompt tuning
+  - Database, email capture, and sharing features are **paused** (disabled in both backend and frontend)
+  - All data is ephemeral/local, nothing is persisted to a DB or sent to external storage
+- When `TEST_MODE=false` (for production):
+  - All features are enabled (if environment variables are set)
+
+**To enable/disable Test Mode:**
+- Set `TEST_MODE=true` in your `.env.local` for local development/testing
+- Set `TEST_MODE=false` in your deployment environment to enable all features
+
 ---
 
 **Ready for testing!** 🎉 

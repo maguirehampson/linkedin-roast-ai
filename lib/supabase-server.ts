@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import getConfig from 'next/config';
 
 // Server-side Supabase client with service role key for privileged operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,6 +35,7 @@ export interface RoastResult {
   share_quote: string;
   meme_caption: string;
   diagnostics: any[];
+  roast_output: any; // Full AI response as JSONB for production analysis
 }
 
 export interface EmailLead {
@@ -44,9 +46,16 @@ export interface EmailLead {
   wants_upgrade: boolean;
 }
 
+function ensureNotTestMode() {
+  if (process.env.TEST_MODE === 'true') {
+    throw new Error('Database/storage/email features are paused in Test Mode.');
+  }
+}
+
 // Supabase Storage operations
 export const SupabaseStorage = {
   async uploadFile(file: Buffer, fileName: string, contentType: string): Promise<string> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -73,6 +82,7 @@ export const SupabaseStorage = {
   },
 
   async getFileUrl(fileName: string): Promise<string> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -85,6 +95,7 @@ export const SupabaseStorage = {
   },
 
   async deleteFile(fileName: string): Promise<void> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -103,6 +114,7 @@ export const SupabaseStorage = {
 // Secure database operations using service role key
 export const RoastDB = {
   async create(roastData: Omit<RoastResult, 'id' | 'created_at'>): Promise<RoastResult> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -122,6 +134,7 @@ export const RoastDB = {
   },
 
   async getById(id: string): Promise<RoastResult | null> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -141,6 +154,7 @@ export const RoastDB = {
   },
 
   async getAll(): Promise<RoastResult[]> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -161,6 +175,7 @@ export const RoastDB = {
 
 export const EmailDB = {
   async create(emailData: Omit<EmailLead, 'id' | 'created_at'>): Promise<EmailLead> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }
@@ -180,6 +195,7 @@ export const EmailDB = {
   },
 
   async getAll(): Promise<EmailLead[]> {
+    ensureNotTestMode();
     if (!supabaseServer) {
       throw new Error('Supabase client not initialized. Check environment variables.');
     }

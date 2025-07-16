@@ -30,10 +30,20 @@ interface ShareModalProps {
   roastData: RoastResult | null;
 }
 
-export default function ShareModal({ isOpen, onClose, roastData }: ShareModalProps) {
+export default function ShareModal(props: ShareModalProps) {
+  const TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
+  if (TEST_MODE) {
+    return (
+      <div className="p-4 border border-gray-600 rounded-xl bg-gray-800 text-center text-gray-400">
+        Sharing is paused in Test Mode.
+      </div>
+    );
+  }
+  if (!props.isOpen || !props.roastData) return null;
+
   const shareText = `I just got roasted by LinkedIn AI! 🔥 
 
-My profile scored ${roastData?.savage_score} and got called out for these hashtags: ${roastData?.hashtags_to_avoid?.join(", ")}
+My profile scored ${props.roastData?.savage_score} and got called out for these hashtags: ${props.roastData?.hashtags_to_avoid?.join(", ")}
 
 Get your own brutal LinkedIn roast at LinkedInRoast.ai`;
 
@@ -52,10 +62,8 @@ Get your own brutal LinkedIn roast at LinkedInRoast.ai`;
     window.open(linkedInUrl, '_blank');
   };
 
-  if (!roastData) return null;
-
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={props.isOpen} onOpenChange={props.onClose}>
       <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">

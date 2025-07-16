@@ -13,7 +13,17 @@ interface EmailCaptureProps {
   onSubmit: (email: string) => Promise<void>;
 }
 
-export default function EmailCapture({ isOpen, onClose, onSubmit }: EmailCaptureProps) {
+export default function EmailCapture(props: EmailCaptureProps) {
+  const { isOpen, onClose, onSubmit } = props;
+  const TEST_MODE = process.env.NEXT_PUBLIC_TEST_MODE === 'true';
+  if (TEST_MODE) {
+    return (
+      <div className="p-4 border border-gray-600 rounded-xl bg-gray-800 text-center text-gray-400">
+        Email capture is paused in Test Mode.
+      </div>
+    );
+  }
+
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 

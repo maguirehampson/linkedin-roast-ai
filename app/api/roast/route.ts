@@ -1,15 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { ROASTBOT_SYSTEM_PROMPT } from '@/ai/systemPrompt';
+import { RoastDB } from '@/lib/supabase-server';
 
 // Initialize OpenAI client at runtime
 const getOpenAIClient = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  let apiKey: string | undefined = process.env.OPENAI_API_KEY;
   console.log('Checking OpenAI API key:', apiKey ? 'Present' : 'Missing');
+  console.log('Environment variables available:', Object.keys(process.env).filter(key => key.includes('OPENAI')));
+  
+  // Temporary fallback for testing
+  if (!apiKey) {
+    console.log('Trying to read from .env.local file directly...');
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const envPath = path.join(process.cwd(), '.env.local');
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        console.log('Raw .env.local content:', envContent);
+        const match = envContent.match(/OPENAI_API_KEY=(.+)/);
+        if (match) {
+          apiKey = match[1].trim();
+          console.log('Found API key in .env.local file:', apiKey ? apiKey.substring(0, 10) + '...' : 'undefined');
+        } else {
+          console.log('No OPENAI_API_KEY found in .env.local file');
+        }
+      } else {
+        console.log('.env.local file does not exist');
+      }
+    } catch (error) {
+      console.log('Could not read .env.local file:', error);
+    }
+  }
+  
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
   }
-  return new OpenAI({ apiKey });
+  
+  // At this point, apiKey is guaranteed to be a string
+  return new OpenAI({ apiKey: apiKey as string });
 };
 
 export async function POST(request: NextRequest) {
@@ -84,6 +114,7 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
     const requiredFields = [
       'roast',
       'savage_score',
+      'score_breakdown',
       'brutal_feedback',
       'constructive_path_forward',
       'hashtags_to_avoid',
@@ -107,12 +138,59 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
     if (!Array.isArray(roastData.top_skills_to_highlight)) throw new Error('top_skills_to_highlight must be an array');
     if (!Array.isArray(roastData.vibe_tags)) throw new Error('vibe_tags must be an array');
     if (!Array.isArray(roastData.diagnostics)) throw new Error('diagnostics must be an array');
+    
+    // Validate score_breakdown structure
+    if (roastData.score_breakdown) {
+      const scoreCategories = ['clarity', 'specificity', 'authenticity', 'professionalism', 'impact'];
+      for (const category of scoreCategories) {
+        if (!(category in roastData.score_breakdown)) {
+          throw new Error(`Missing score category: ${category}`);
+        }
+        const score = roastData.score_breakdown[category];
+        if (typeof score !== 'number' || score < 0 || score > 20) {
+          throw new Error(`Invalid score for ${category}: must be number between 0-20`);
+        }
+      }
+    }
 
-    console.log('All validations passed, returning response');
-    // Return the roast data without storing in database
+    console.log('All validations passed, storing in database...');
+    
+    // Generate session ID
+    const sessionId = Math.random().toString(36).substring(2, 11);
+    
+    // Store in database (skip in test mode)
+    let storedRoast = null;
+    if (process.env.TEST_MODE !== 'true') {
+      try {
+        storedRoast = await RoastDB.create({
+          goals_text: goals,
+          profile_text: profileText,
+          context_text: contextText || null,
+          roast_text: roastData.roast,
+          savage_score: `${roastData.savage_score}/100`,
+          brutal_feedback: roastData.brutal_feedback,
+          constructive_path_forward: roastData.constructive_path_forward,
+          hashtags_to_avoid: roastData.hashtags_to_avoid,
+          top_skills_to_highlight: roastData.top_skills_to_highlight,
+          session_id: sessionId,
+          profile_pdf_url: null, // Will be set by frontend if needed
+          context_file_url: null, // Will be set by frontend if needed
+          vibe_tags: roastData.vibe_tags,
+          share_quote: roastData.share_quote,
+          meme_caption: roastData.meme_caption,
+          diagnostics: roastData.diagnostics,
+          roast_output: roastData // Store full AI response as JSONB
+        });
+        console.log('Roast stored in database successfully');
+      } catch (dbError) {
+        console.error('Database storage failed:', dbError);
+        // Continue without failing the request - return the roast even if DB fails
+      }
+    }
+
     return NextResponse.json({
       ...roastData,
-      id: Math.random().toString(36).substr(2, 9), // Generate a simple ID for testing
+      id: storedRoast?.id || sessionId,
       timestamp: new Date().toISOString()
     });
 

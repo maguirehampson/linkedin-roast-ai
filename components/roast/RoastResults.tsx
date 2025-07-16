@@ -13,6 +13,13 @@ interface RoastResult {
   context_file_url?: string;
   roast_text: string;
   savage_score: string; // e.g., "65/100"
+  score_breakdown?: {
+    clarity: number;
+    specificity: number;
+    authenticity: number;
+    professionalism: number;
+    impact: number;
+  };
   brutal_feedback: string;
   constructive_path_forward: string;
   hashtags_to_avoid: string[];
@@ -99,18 +106,38 @@ export default function RoastResults({ roastData, onTryAgain, onEmailCapture, on
         {/* Share Quote & Meme Caption */}
         <div className="flex flex-col md:flex-row gap-4 justify-center items-center mb-2">
           {roastData.share_quote && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-3">
               <span className="italic text-gray-200">"{roastData.share_quote}"</span>
-              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(roastData.share_quote)} title="Copy share quote">
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => {
+                  copyToClipboard(roastData.share_quote);
+                  alert('Share quote copied to clipboard!');
+                }} 
+                title="Copy share quote"
+                className="ml-2 hover:bg-blue-700"
+              >
                 <Share2 className="w-4 h-4 text-blue-400" />
+                Copy
               </Button>
             </div>
           )}
           {roastData.meme_caption && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-3">
               <span className="italic text-gray-400">{roastData.meme_caption}</span>
-              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(roastData.meme_caption)} title="Copy meme caption">
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => {
+                  copyToClipboard(roastData.meme_caption);
+                  alert('Meme caption copied to clipboard!');
+                }} 
+                title="Copy meme caption"
+                className="ml-2 hover:bg-yellow-700"
+              >
                 <Share2 className="w-4 h-4 text-yellow-400" />
+                Copy
               </Button>
             </div>
           )}
@@ -145,7 +172,7 @@ export default function RoastResults({ roastData, onTryAgain, onEmailCapture, on
               <h2 className="text-2xl font-bold">Profile Score</h2>
             </div>
             
-            <div className="text-center">
+            <div className="text-center mb-6">
               <div className={`text-6xl font-bold ${getScoreColor(roastData.savage_score)} mb-2`}>
                 {roastData.savage_score}
               </div>
@@ -164,6 +191,33 @@ export default function RoastResults({ roastData, onTryAgain, onEmailCapture, on
                 {getScoreMessage(roastData.savage_score)}
               </p>
             </div>
+
+            {/* Score Breakdown */}
+            {roastData.score_breakdown && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Score Breakdown</h3>
+                {Object.entries(roastData.score_breakdown).map(([category, score]) => (
+                  <div key={category} className="flex items-center justify-between">
+                    <span className="text-sm capitalize text-gray-300">{category}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(score as number / 20) * 100}%` }}
+                          transition={{ duration: 0.8, delay: 0.3 }}
+                          className={`h-2 rounded-full ${
+                            (score as number) >= 16 ? 'bg-green-500' :
+                            (score as number) >= 12 ? 'bg-yellow-500' :
+                            (score as number) >= 8 ? 'bg-orange-500' : 'bg-red-500'
+                          }`}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold w-8 text-right">{score}/20</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
 
           {/* Brutal Feedback */}

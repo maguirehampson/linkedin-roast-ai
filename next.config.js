@@ -6,4 +6,9 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
+module.exports = {
+  ...nextConfig,
+  env: {
+    NEXT_PUBLIC_TEST_MODE: process.env.TEST_MODE || 'true',
+  },
+}; 

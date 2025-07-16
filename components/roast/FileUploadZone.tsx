@@ -12,13 +12,9 @@ interface FileUploadZoneProps {
   maxSize?: number; // in bytes
 }
 
-export default function FileUploadZone({ 
-  onFileSelect, 
-  acceptedTypes, 
-  label, 
-  file, 
-  maxSize = 10 * 1024 * 1024 // 10MB default
-}: FileUploadZoneProps) {
+export default function FileUploadZone(props: FileUploadZoneProps) {
+  const maxSize = props.maxSize ?? 10 * 1024 * 1024; // 10MB default
+  // Remove the TEST_MODE check for file upload UI
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +25,7 @@ export default function FileUploadZone({
     }
 
     // Check file type
-    const allowedTypes = acceptedTypes.split(',').map(type => type.trim());
+    const allowedTypes = props.acceptedTypes.split(',').map(type => type.trim());
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     
     const isValidType = allowedTypes.some(type => {
@@ -40,7 +36,7 @@ export default function FileUploadZone({
     });
 
     if (!isValidType) {
-      return `Invalid file type. Please upload: ${acceptedTypes}`;
+      return `Invalid file type. Please upload: ${props.acceptedTypes}`;
     }
 
     return null;
@@ -54,7 +50,7 @@ export default function FileUploadZone({
     }
     
     setError(null);
-    onFileSelect(selectedFile);
+    props.onFileSelect(selectedFile);
   };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -83,24 +79,24 @@ export default function FileUploadZone({
     }
   };
   
-  const inputId = `file-upload-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  const inputId = `file-upload-${props.label.replace(/\s+/g, '-').toLowerCase()}`;
 
-  if (file) {
+  if (props.file) {
     return (
       <div className="bg-gray-700 rounded-xl p-4 flex items-center justify-between border border-green-500">
         <div className="flex items-center gap-3">
           <File className="w-5 h-5 text-green-400" />
           <div>
-            <span className="text-sm text-white">{file.name}</span>
+            <span className="text-sm text-white">{props.file.name}</span>
             <div className="text-xs text-gray-400">
-              {(file.size / 1024 / 1024).toFixed(2)} MB
+              {(props.file.size / 1024 / 1024).toFixed(2)} MB
             </div>
           </div>
         </div>
         <button
           type="button"
           onClick={() => {
-            onFileSelect(null);
+            props.onFileSelect(null);
             setError(null);
           }}
           className="text-gray-400 hover:text-white transition-colors"
@@ -126,7 +122,7 @@ export default function FileUploadZone({
         <input
           id={inputId}
           type="file"
-          accept={acceptedTypes}
+          accept={props.acceptedTypes}
           onChange={handleChange}
           className="hidden"
         />
@@ -135,7 +131,7 @@ export default function FileUploadZone({
           className="flex flex-col items-center"
         >
           <UploadCloud className="w-8 h-8 mb-2 text-gray-400" />
-          <span className="font-semibold text-white">{label}</span>
+          <span className="font-semibold text-white">{props.label}</span>
           <span className="text-xs text-gray-400">
             Drag & drop or click to upload (max {Math.round(maxSize / 1024 / 1024)}MB)
           </span>
