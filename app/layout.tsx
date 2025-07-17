@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: 'LinkedIn Roast AI - Get Brutally Honest Feedback',
@@ -21,6 +22,7 @@ export default function RootLayout({
           </div>
         </div>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
