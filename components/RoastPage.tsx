@@ -41,95 +41,147 @@ export default function RoastPage() {
   const [showEmailCapture, setShowEmailCapture] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const handleRoastSubmit = async (data: { profilePdf: File; goals: string; contextFile?: File }) => {
+  const handleRoastSubmit = async (data: { profilePdf?: File; linkedinUrl?: string; goals: string; contextFile?: File }) => {
     setCurrentStep('loading');
 
     try {
-      // Step 1: Upload profile PDF
-      const profileFormData = new FormData();
-      profileFormData.append('file', data.profilePdf);
-
-      const profileUploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        body: profileFormData,
-      });
-
-      if (!profileUploadResponse.ok) {
-        throw new Error('Failed to upload profile PDF');
-      }
-
-      const profileUploadResult = await profileUploadResponse.json();
-
-      // Step 2: Extract text from profile PDF
-      const extractResponse = await fetch('/api/extract-text', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ fileUrl: profileUploadResult.file_url }),
-      });
-
-      if (!extractResponse.ok) {
-        throw new Error('Failed to extract text from profile PDF');
-      }
-
-      const extractResult = await extractResponse.json();
-
-      // Step 3: Handle context file if provided
+      let profileText = '';
+      let profile_pdf_url = '';
       let contextText = '';
-      if (data.contextFile) {
+      let context_file_url = '';
+
+      // If LinkedIn URL is provided, skip PDF upload and extraction
+      if (data.linkedinUrl) {
+        // Optionally handle context file if provided
+        if (data.contextFile) {
+          const contextFormData = new FormData();
+          contextFormData.append('file', data.contextFile);
+          const contextUploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: contextFormData,
+          });
+          if (contextUploadResponse.ok) {
+            const contextUploadResult = await contextUploadResponse.json();
+            const contextExtractResponse = await fetch('/api/extract-text', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileUrl: contextUploadResult.file_url }),
+            });
+            if (contextExtractResponse.ok) {
+              const contextExtractResult = await contextExtractResponse.json();
+              contextText = contextExtractResult.text;
+              context_file_url = contextUploadResult.file_url;
+            }
+          }
+        }
+        // Call roast API with linkedinUrl
+        const roastResponse = await fetch('/api/roast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            goals: data.goals,
+            linkedinUrl: data.linkedinUrl,
+            contextText: contextText,
+          }),
+        });
+        if (!roastResponse.ok) {
+          const errorData = await roastResponse.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || 'Failed to generate roast');
+        }
+        const roastData = await roastResponse.json();
+        const transformedResult: RoastResult = {
+          id: roastData.id || Math.random().toString(36).substring(2, 11),
+          goals_text: data.goals,
+          profile_pdf_url: '',
+          context_file_url: context_file_url || undefined,
+          roast_text: roastData.roast,
+          savage_score: `${roastData.savage_score}/100`,
+          score_breakdown: roastData.score_breakdown || undefined,
+          brutal_feedback: roastData.brutal_feedback,
+          constructive_path_forward: roastData.constructive_path_forward,
+          hashtags_to_avoid: roastData.hashtags_to_avoid || [],
+          top_skills_to_highlight: roastData.top_skills_to_highlight || [],
+          session_id: roastData.id || Math.random().toString(36).substring(2, 11),
+          vibe_tags: roastData.vibe_tags || [],
+          share_quote: roastData.share_quote || '',
+          meme_caption: roastData.meme_caption || '',
+          diagnostics: roastData.diagnostics || [],
+        };
+        setRoastResult(transformedResult);
+        setCurrentStep('results');
+        return;
+      }
+
+      // PDF upload flow (existing)
+      if (data.profilePdf) {
+        // Step 1: Upload profile PDF
+        const profileFormData = new FormData();
+        profileFormData.append('file', data.profilePdf);
+        const profileUploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: profileFormData,
+        });
+        if (!profileUploadResponse.ok) {
+          throw new Error('Failed to upload profile PDF');
+        }
+        const profileUploadResult = await profileUploadResponse.json();
+        profile_pdf_url = profileUploadResult.file_url;
+        // Step 2: Extract text from profile PDF
+        const extractResponse = await fetch('/api/extract-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl: profileUploadResult.file_url }),
+        });
+        if (!extractResponse.ok) {
+          throw new Error('Failed to extract text from profile PDF');
+        }
+        const extractResult = await extractResponse.json();
+        profileText = extractResult.text;
+      }
+
+      // Step 3: Handle context file if provided (PDF flow)
+      if (data.contextFile && !data.linkedinUrl) {
         const contextFormData = new FormData();
         contextFormData.append('file', data.contextFile);
-
         const contextUploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: contextFormData,
         });
-
         if (contextUploadResponse.ok) {
           const contextUploadResult = await contextUploadResponse.json();
-
           const contextExtractResponse = await fetch('/api/extract-text', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileUrl: contextUploadResult.file_url }),
           });
-
           if (contextExtractResponse.ok) {
             const contextExtractResult = await contextExtractResponse.json();
             contextText = contextExtractResult.text;
+            context_file_url = contextUploadResult.file_url;
           }
         }
       }
 
-      // Step 4: Generate roast
+      // Step 4: Generate roast (PDF flow)
       const roastResponse = await fetch('/api/roast', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           goals: data.goals,
-          profileText: extractResult.text,
+          profileText: profileText,
           contextText: contextText,
         }),
       });
-
       if (!roastResponse.ok) {
         const errorData = await roastResponse.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(errorData.error || 'Failed to generate roast');
       }
-
       const roastData = await roastResponse.json();
-
-      // Transform the API response to match our interface
       const transformedResult: RoastResult = {
         id: roastData.id || Math.random().toString(36).substring(2, 11),
         goals_text: data.goals,
-        profile_pdf_url: profileUploadResult.file_url,
-        context_file_url: data.contextFile ? '' : undefined, // Would be set if context file was uploaded
+        profile_pdf_url: profile_pdf_url,
+        context_file_url: context_file_url || undefined,
         roast_text: roastData.roast,
         savage_score: `${roastData.savage_score}/100`,
         score_breakdown: roastData.score_breakdown || undefined,
@@ -143,7 +195,6 @@ export default function RoastPage() {
         meme_caption: roastData.meme_caption || '',
         diagnostics: roastData.diagnostics || [],
       };
-
       setRoastResult(transformedResult);
       setCurrentStep('results');
     } catch (error) {

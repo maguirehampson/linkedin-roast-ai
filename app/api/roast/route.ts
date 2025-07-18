@@ -3,6 +3,60 @@ import OpenAI from 'openai';
 import { ROASTBOT_SYSTEM_PROMPT } from '@/ai/systemPrompt';
 import { RoastDB } from '@/lib/supabase-server';
 
+async function fetchLinkedinProfileText(linkedinUrlOrId: string): Promise<string> {
+  // Extract LinkedIn ID if a URL is provided
+  let linkId = linkedinUrlOrId;
+  const urlMatch = linkedinUrlOrId.match(/linkedin\.com\/in\/([a-zA-Z0-9\-_%]+)/i);
+  if (urlMatch) {
+    linkId = urlMatch[1];
+  }
+  const apiKey = process.env.SCRAPINGDOG_API_KEY;
+  if (!apiKey) throw new Error('SCRAPINGDOG_API_KEY environment variable is not set');
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    type: 'profile',
+    linkId,
+  });
+  const apiRes = await fetch(`https://api.scrapingdog.com/linkedin/?${params.toString()}`);
+  if (!apiRes.ok) {
+    throw new Error('Failed to fetch LinkedIn profile from ScrapingDog');
+  }
+  const data = await apiRes.json();
+  // Try to extract a reasonable text representation from the returned JSON
+  if (Array.isArray(data) && data.length > 0) {
+    const profile = data[0];
+    // Concatenate relevant fields for the roast
+    let text = '';
+    if (profile.fullName) text += `Name: ${profile.fullName}\n`;
+    if (profile.headline) text += `Headline: ${profile.headline}\n`;
+    if (profile.about) text += `About: ${profile.about}\n`;
+    if (profile.experience && Array.isArray(profile.experience)) {
+      text += 'Experience:\n';
+      for (const exp of profile.experience) {
+        text += `- ${exp.position} at ${exp.company_name} (${exp.starts_at} - ${exp.ends_at})\n`;
+        if (exp.summary) text += `  ${exp.summary}\n`;
+      }
+    }
+    if (profile.articles && Array.isArray(profile.articles)) {
+      text += 'Articles:\n';
+      for (const art of profile.articles) {
+        text += `- ${art.title} (${art.published_date})\n`;
+      }
+    }
+    if (profile.activities && Array.isArray(profile.activities)) {
+      text += 'Recent Activities:\n';
+      for (const act of profile.activities) {
+        text += `- ${act.title}\n`;
+      }
+    }
+    if (profile.skills && Array.isArray(profile.skills)) {
+      text += 'Skills: ' + profile.skills.join(', ') + '\n';
+    }
+    return text.trim();
+  }
+  throw new Error('Invalid response from ScrapingDog API');
+}
+
 // Initialize OpenAI client at runtime
 const getOpenAIClient = () => {
   let apiKey: string | undefined = process.env.OPENAI_API_KEY;
@@ -45,13 +99,34 @@ const getOpenAIClient = () => {
 export async function POST(request: NextRequest) {
   try {
     console.log('Roast API called');
-    const { goals, profileText, contextText } = await request.json();
+    const { goals, profileText, contextText, linkedinUrl, linkedinId } = await request.json();
 
-    console.log('Request data:', { goals: goals?.substring(0, 50), profileText: profileText?.substring(0, 50) });
+    let effectiveProfileText = profileText;
+    if (!effectiveProfileText && (linkedinUrl || linkedinId)) {
+      // Fetch from ScrapingDog
+      const idOrUrl = linkedinId || linkedinUrl;
+      if (!idOrUrl) {
+        return NextResponse.json(
+          { error: 'LinkedIn URL or ID is required if no profileText is provided' },
+          { status: 400 }
+        );
+      }
+      try {
+        effectiveProfileText = await fetchLinkedinProfileText(idOrUrl);
+      } catch (err) {
+        console.error('Error fetching LinkedIn profile:', err);
+        return NextResponse.json(
+          { error: 'Failed to fetch LinkedIn profile: ' + (err instanceof Error ? err.message : String(err)) },
+          { status: 500 }
+        );
+      }
+    }
+
+    console.log('Request data:', { goals: goals?.substring(0, 50), profileText: effectiveProfileText?.substring(0, 50) });
 
     // Validate input
-    if (!goals || !profileText) {
-      console.error('Missing required fields:', { goals: !!goals, profileText: !!profileText });
+    if (!goals || !effectiveProfileText) {
+      console.error('Missing required fields:', { goals: !!goals, profileText: !!effectiveProfileText });
       return NextResponse.json(
         { error: 'Goals and profile text are required' },
         { status: 400 }
@@ -65,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     const userPrompt = `User's Goals: "${goals}"
 
-LinkedIn Profile Text: "${profileText}"
+LinkedIn Profile Text: "${effectiveProfileText}"
 
 ${contextText ? `Additional Context: "${contextText}"` : ''}
 
@@ -164,7 +239,7 @@ Remember to return ONLY valid JSON with the exact structure specified in the sys
       try {
         storedRoast = await RoastDB.create({
           goals_text: goals,
-          profile_text: profileText,
+          profile_text: effectiveProfileText,
           context_text: contextText || undefined,
           roast_text: roastData.roast,
           savage_score: `${roastData.savage_score}/100`,
